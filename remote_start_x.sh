@@ -89,6 +89,10 @@ if [[ "$OSTYPE" == "linux"* ]]; then
       CURRENT_DISPLAY="$DISPLAY"
       CURRENT_SCREEN_NUMBER=$(echo "$CURRENT_DISPLAY" | sed 's/.*:\(.*\)\..*/\1/')
       DISP="172.17.0.1:${CURRENT_SCREEN_NUMBER}"
+      # バインド用ファイルに書き出す
+      DISPLAY_TMPFILE="/tmp/.${CONTAINER_NAME}_display"
+      echo $DISP > $DISPLAY_TMPFILE
+      PARAMS="$PARAMS -v $DISPLAY_TMPFILE:/headless/.display:r"
 		fi
 	fi
 
@@ -106,11 +110,10 @@ if [[ "$OSTYPE" == "linux"* ]]; then
 			XAUTH=$XAUTHORITY
 		fi
 
-    # 空ファイル作成
+    # Xauth 空ファイル作成
 		# Thanks to https://stackoverflow.com/a/25280523
     # ファミリーワイルド。16進数先頭4字を$FFFFとすることで、あらゆるDISPLAYに対してクッキーを有効化する
 		XAUTH_TMP="/tmp/.${CONTAINER_NAME}_xauthority"
-		#create an empty file
 		${ECHO_IF_DRY_RUN} echo -n > "${XAUTH_TMP}"
 		if [ -z "${ECHO_IF_DRY_RUN}" ]; then
 			xauth -f "${XAUTH}" nlist "${DISPLAY}" | sed -e 's/^..../ffff/' | xauth -f "${XAUTH_TMP}" nmerge -
@@ -168,6 +171,25 @@ if [ "$(docker ps -aq -f name="${CONTAINER_NAME}")" ]; then
 	read -r -n 1 k <&1
 	echo
 	if [[ $k = s ]] ; then
+
+    ## 追加処理ここから ##
+    # 現在のDISPLAY変数の値を取得する
+    CURRENT_DISPLAY="$DISPLAY"
+    CURRENT_SCREEN_NUMBER=$(echo "$CURRENT_DISPLAY" | sed 's/.*:\(.*\)\..*/\1/')
+    DISP="172.17.0.1:${CURRENT_SCREEN_NUMBER}"
+    # バインド用ファイルに書き出す
+    DISPLAY_TMPFILE="/tmp/.${CONTAINER_NAME}_display"
+    echo $DISP > $DISPLAY_TMPFILE
+    # XAUTHの再設定
+		XAUTH_TMP="/tmp/.${CONTAINER_NAME}_xauthority"
+		${ECHO_IF_DRY_RUN} echo -n > "${XAUTH_TMP}"
+		if [ -z "${ECHO_IF_DRY_RUN}" ]; then
+			xauth -f "${XAUTH}" nlist "${DISPLAY}" | sed -e 's/^..../ffff/' | xauth -f "${XAUTH_TMP}" nmerge -
+		else
+			${ECHO_IF_DRY_RUN} "xauth -f ${XAUTH} nlist ${DISPLAY} | sed -e 's/^..../ffff/' | xauth -f ${XAUTH_TMP} nmerge -"
+		fi
+    ## 追加処理ここまで ##
+
 		${ECHO_IF_DRY_RUN} docker start "${CONTAINER_NAME}"
 	elif [[ $k = r ]] ; then
 		${ECHO_IF_DRY_RUN} docker rm "${CONTAINER_NAME}"
@@ -178,7 +200,10 @@ else
 	${ECHO_IF_DRY_RUN} docker pull "${DOCKER_USER}/${DOCKER_IMAGE}:${DOCKER_TAG}"
 	# Disable SC2086, $PARAMS must be globbed and splitted.
 	# shellcheck disable=SC2086
-	# ${ECHO_IF_DRY_RUN} docker run -d --user "${CONTAINER_USER}:${CONTAINER_GROUP}" -e "DISPLAY=${DISP}" -v "${DESIGNS}:/foss/designs:rw" ${PARAMS} --name "${CONTAINER_NAME}" "${DOCKER_USER}/${DOCKER_IMAGE}:${DOCKER_TAG}"
-	${ECHO_IF_DRY_RUN} docker run -d --user "${CONTAINER_USER}:${CONTAINER_GROUP}" -e "DISPLAY=${DISP}" -v "${DESIGNS}:/foss/designs:rw" ${PARAMS} --name "${CONTAINER_NAME}" "${DOCKER_USER}/${DOCKER_IMAGE}:${DOCKER_TAG}"
+	${ECHO_IF_DRY_RUN} docker run -d --user "${CONTAINER_USER}:${CONTAINER_GROUP}" \
+    -e "DISPLAY=${DISP}" \
+    -v "${DESIGNS}:/foss/designs:rw" \
+    ${PARAMS} \
+    --name "${CONTAINER_NAME}" "${DOCKER_USER}/${DOCKER_IMAGE}:${DOCKER_TAG}"
 fi
 

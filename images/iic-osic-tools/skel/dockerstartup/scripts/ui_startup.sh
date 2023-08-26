@@ -137,6 +137,7 @@ if [ "$start_vnc" = true ]; then
 fi
 
 if [ "$start_x" = true ]; then
+  export DISPLAY=$(cat /headless/.display)
   xfce4-terminal | tag "[TERM]" &
   # add an empty newline so one can see that this script is done.
   echo
