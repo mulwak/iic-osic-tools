@@ -92,7 +92,7 @@ if [[ "$OSTYPE" == "linux"* ]]; then
       # バインド用ファイルに書き出す
       DISPLAY_TMPFILE="/tmp/.${CONTAINER_NAME}_display"
       echo $DISP > $DISPLAY_TMPFILE
-      PARAMS="$PARAMS -v $DISPLAY_TMPFILE:/headless/.display:r"
+      PARAMS="$PARAMS -v $DISPLAY_TMPFILE:/headless/.display:ro"
 		fi
 	fi
 
@@ -181,13 +181,23 @@ if [ "$(docker ps -aq -f name="${CONTAINER_NAME}")" ]; then
     DISPLAY_TMPFILE="/tmp/.${CONTAINER_NAME}_display"
     echo $DISP > $DISPLAY_TMPFILE
     # XAUTHの再設定
-		XAUTH_TMP="/tmp/.${CONTAINER_NAME}_xauthority"
-		${ECHO_IF_DRY_RUN} echo -n > "${XAUTH_TMP}"
-		if [ -z "${ECHO_IF_DRY_RUN}" ]; then
-			xauth -f "${XAUTH}" nlist "${DISPLAY}" | sed -e 's/^..../ffff/' | xauth -f "${XAUTH_TMP}" nmerge -
-		else
-			${ECHO_IF_DRY_RUN} "xauth -f ${XAUTH} nlist ${DISPLAY} | sed -e 's/^..../ffff/' | xauth -f ${XAUTH_TMP} nmerge -"
-		fi
+    if [ -z ${XAUTHORITY+z} ]; then
+      if [ -f "$HOME/.Xauthority" ]; then
+        XAUTH="$HOME/.Xauthority"
+      else
+        echo "[ERROR] Xauthority could not be found. Please set it manually!"
+        exit 1
+      fi
+    else
+      XAUTH=$XAUTHORITY
+    fi
+    XAUTH_TMP="/tmp/.${CONTAINER_NAME}_xauthority"
+    ${ECHO_IF_DRY_RUN} echo -n > "${XAUTH_TMP}"
+    if [ -z "${ECHO_IF_DRY_RUN}" ]; then
+      xauth -f "${XAUTH}" nlist "${DISPLAY}" | sed -e 's/^..../ffff/' | xauth -f "${XAUTH_TMP}" nmerge -
+    else
+      ${ECHO_IF_DRY_RUN} "xauth -f ${XAUTH} nlist ${DISPLAY} | sed -e 's/^..../ffff/' | xauth -f ${XAUTH_TMP} nmerge -"
+    fi
     ## 追加処理ここまで ##
 
 		${ECHO_IF_DRY_RUN} docker start "${CONTAINER_NAME}"
