@@ -23,68 +23,73 @@
 # ========================================================================
 
 if [ -n "${DRY_RUN}" ]; then
-	echo "[INFO] This is a dry run, all commands will be printed to the shell (Commands printed but not executed are marked with $)!"
-	ECHO_IF_DRY_RUN="echo $"
+  echo "[INFO] 試し実行（ドライラン）です。本実行で実行されるべきコマンドが表示されますが実行はされません。"
+  ECHO_IF_DRY_RUN="echo $"
 fi
 
 if [ -z ${CONTAINER_NAME+z} ]; then
-	CONTAINER_NAME="iic-osic-tools_xserver_uid_"$(id -u)
+  CONTAINER_NAME="iic-osic-tools_xserver_uid_"$(id -u)
 fi
 
-# Check if the container exists and if it is running.
+# コンテナが既に存在している、あるいはさらに実行中であるのをチェック
 if [ "$(docker ps -q -f name="${CONTAINER_NAME}")" ]; then
-	echo "[WARNING] Container is running!"
-	echo "[HINT] It can also be stopped with \"docker stop ${CONTAINER_NAME}\" and removed with \"docker rm ${CONTAINER_NAME}\" if required."
-	echo
-	echo -n "Press \"s\" to stop, and \"r\" to stop & remove: "
-	read -r -n 1 k <&1
-	echo
-	if [[ $k = s ]] ; then
-		${ECHO_IF_DRY_RUN} docker stop "${CONTAINER_NAME}"
-	elif [[ $k = r ]] ; then
-		${ECHO_IF_DRY_RUN} docker stop "${CONTAINER_NAME}"
-		${ECHO_IF_DRY_RUN} docker rm "${CONTAINER_NAME}"
-	fi
+  echo "[WARNING] コンテナが実行中です！"
+  echo "          別の端末で付けっぱなしではありませんか？"
+  echo "          強制的にstopするか、removeしてしまうこともできます。"
+  #echo "[HINT] It can also be stopped with \"docker stop ${CONTAINER_NAME}\" and removed with \"docker rm ${CONTAINER_NAME}\" if required."
+  echo
+  echo -n "\"s\"キーでstop, または\"r\"キーでremoveします："
+  read -r -n 1 k <&1
+  echo
+  if [[ $k = s ]] ; then
+    ${ECHO_IF_DRY_RUN} docker stop "${CONTAINER_NAME}"
+  elif [[ $k = r ]] ; then
+    ${ECHO_IF_DRY_RUN} docker stop "${CONTAINER_NAME}"
+    ${ECHO_IF_DRY_RUN} docker rm "${CONTAINER_NAME}"
+  fi
 fi
 
-# SET YOUR DESIGN PATH RIGHT!
+# デザインディレクトリの設定
 if [ -z ${DESIGNS+z} ]; then
-	DESIGNS=$HOME/eda/designs
-	if [ ! -d "$DESIGNS" ]; then
-		${ECHO_IF_DRY_RUN} mkdir -p "$DESIGNS"
-	fi
-	echo "[INFO] Design directory auto-set to $DESIGNS."
+  DESIGNS=$HOME/eda/designs
+  if [ ! -d "$DESIGNS" ]; then
+    ${ECHO_IF_DRY_RUN} mkdir -p "$DESIGNS"
+  fi
+  echo "[INFO] デザインディレクトリ（作業フォルダ）が自動的に${DESIGNS}に設定されました。"
+  echo "[HINT] $ export DESIGNS=\"path/to/dir\"を事前に指定することで変更できます。"
 fi
 
-if [ -z ${DOCKER_USER+z} ]; then
-	DOCKER_USER="hpretl"
-fi
+# ローカルでカスタムしたイメージを使うのでこれはいらない
+#if [ -z ${DOCKER_USER+z} ]; then
+#  DOCKER_USER="hpretl"
+#fi
 
 if [ -z ${DOCKER_IMAGE+z} ]; then
-	DOCKER_IMAGE="islab-osic-tools"
+  DOCKER_IMAGE="islab-osic-tools"
 fi
 
 if [ -z ${DOCKER_TAG+z} ]; then
-	DOCKER_TAG="latest"
+  DOCKER_TAG="latest"
 fi
 
 PARAMS="--security-opt seccomp=unconfined"
 if [[ "$OSTYPE" == "linux"* ]]; then
-	echo "[INFO] Auto detected Linux."
-	# Should also be a sensible default
-	if [ -z ${CONTAINER_USER+z} ]; then
-	        CONTAINER_USER=$(id -u)
-	fi
+  echo "[INFO] 自動的にLinux環境を検知しました。"
+  # Should also be a sensible default
+  if [ -z ${CONTAINER_USER+z} ]; then
+    CONTAINER_USER=$(id -u)
+  fi
 
-	if [ -z ${CONTAINER_GROUP+z} ]; then
-	        CONTAINER_GROUP=$(id -g)
-	fi
+  if [ -z ${CONTAINER_GROUP+z} ]; then
+    CONTAINER_GROUP=$(id -g)
+  fi
 
-	if [ -z ${DISP+z} ]; then
-		if [ -z ${DISPLAY+z} ]; then
-			echo "[ERROR] No DISPLAY set!"
-			exit 1
-		else
+  if [ -z ${DISP+z} ]; then
+    if [ -z ${DISPLAY+z} ]; then
+      echo "[ERROR] 環境変数DISPLAYが未設定です！"
+      echo "        X11が使用可能な環境であることを確認してください。"
+      exit 1
+    else
       # 現在のDISPLAY変数の値を取得する
       CURRENT_DISPLAY="$DISPLAY"
       CURRENT_SCREEN_NUMBER=$(echo "$CURRENT_DISPLAY" | sed 's/.*:\(.*\)\..*/\1/')
@@ -93,84 +98,85 @@ if [[ "$OSTYPE" == "linux"* ]]; then
       DISPLAY_TMPFILE="/tmp/.${CONTAINER_NAME}_display"
       echo $DISP > $DISPLAY_TMPFILE
       PARAMS="$PARAMS -v $DISPLAY_TMPFILE:/headless/.display:ro"
-		fi
-	fi
+    fi
+  fi
 
-	if [ -z ${XAUTH+z} ]; then
-    #$XAUTHの設定
-		# Senseful defaults (uses XAUTHORITY Shell variable if set, or the default .Xauthority -file in the caller home directory)
-		if [ -z ${XAUTHORITY+z} ]; then
-			if [ -f "$HOME/.Xauthority" ]; then
-				XAUTH="$HOME/.Xauthority"
-			else
-				echo "[ERROR] Xauthority could not be found. Please set it manually!"
-				exit 1
-			fi
-		else
-			XAUTH=$XAUTHORITY
-		fi
+  if [ -z ${XAUTH+z} ]; then
+    # XAUTHの設定
+    # XAUTHORITYが未設定なら$HOME/.Xauthorityを使う。
+    if [ -z ${XAUTHORITY+z} ]; then
+      if [ -f "$HOME/.Xauthority" ]; then
+        XAUTH="$HOME/.Xauthority"
+      else
+        echo "[ERROR] Xauthority が見つかりません！"
+        exit 1
+      fi
+    else
+      XAUTH=$XAUTHORITY
+    fi
 
     # Xauth 空ファイル作成
-		# Thanks to https://stackoverflow.com/a/25280523
+    # Thanks to https://stackoverflow.com/a/25280523
     # ファミリーワイルド。16進数先頭4字を$FFFFとすることで、あらゆるDISPLAYに対してクッキーを有効化する
-		XAUTH_TMP="/tmp/.${CONTAINER_NAME}_xauthority"
-		${ECHO_IF_DRY_RUN} echo -n > "${XAUTH_TMP}"
-		if [ -z "${ECHO_IF_DRY_RUN}" ]; then
-			xauth -f "${XAUTH}" nlist "${DISPLAY}" | sed -e 's/^..../ffff/' | xauth -f "${XAUTH_TMP}" nmerge -
-		else
-			${ECHO_IF_DRY_RUN} "xauth -f ${XAUTH} nlist ${DISPLAY} | sed -e 's/^..../ffff/' | xauth -f ${XAUTH_TMP} nmerge -"
-		fi
-		XAUTH=${XAUTH_TMP}
+    XAUTH_TMP="/tmp/.${CONTAINER_NAME}_xauthority"
+    ${ECHO_IF_DRY_RUN} echo -n > "${XAUTH_TMP}"
+    if [ -z "${ECHO_IF_DRY_RUN}" ]; then
+      xauth -f "${XAUTH}" nlist "${DISPLAY}" | sed -e 's/^..../ffff/' | xauth -f "${XAUTH_TMP}" nmerge -
+    else
+      ${ECHO_IF_DRY_RUN} "xauth -f ${XAUTH} nlist ${DISPLAY} | sed -e 's/^..../ffff/' | xauth -f ${XAUTH_TMP} nmerge -"
+    fi
+    XAUTH=${XAUTH_TMP}
 
     # グラフィックドライバ
-		if [ -d "/dev/dri" ]; then
-			echo "[INFO] /dev/dri detected, forwarding GPU for graphics acceleration."
-			PARAMS="${PARAMS} --device=/dev/dri:/dev/dri"
-		else
-			echo "[INFO] No /dev/dri detected!"
-			FORCE_LIBGL_INDIRECT=1
-		fi
-	fi
-	PARAMS="$PARAMS -v $XAUTH:/headless/.xauthority:rw -e XAUTHORITY=/headless/.xauthority"
+    if [ -d "/dev/dri" ]; then
+      echo "[INFO] /dev/dri を発見しました。GPUによるグラフィックアクセラレーションを適用します。"
+      PARAMS="${PARAMS} --device=/dev/dri:/dev/dri"
+    else
+      echo "[INFO] /dev/driはありませんでした！"
+      FORCE_LIBGL_INDIRECT=1
+    fi
+  fi
+  PARAMS="$PARAMS -v $XAUTH:/headless/.xauthority:rw -e XAUTHORITY=/headless/.xauthority"
 fi
 
 if [ -n "${FORCE_LIBGL_INDIRECT}" ]; then
-	echo "[INFO] Using indirect rendering."
-	PARAMS="${PARAMS} -e LIBGL_ALWAYS_INDIRECT=1"
+  echo "[INFO] 間接レンダリングを行います。"
+  PARAMS="${PARAMS} -e LIBGL_ALWAYS_INDIRECT=1"
 fi
 
 if [ -n "${DOCKER_EXTRA_PARAMS}" ]; then
-	PARAMS="${PARAMS} ${DOCKER_EXTRA_PARAMS}"
+  PARAMS="${PARAMS} ${DOCKER_EXTRA_PARAMS}"
 fi
 
-# Check for UIDs and GIDs below 1000, except 0 (root)
+# 1000以上の、ふつうのUIDおよびGIDであることを確かめる
 if [[ ${CONTAINER_USER} -ne 0 ]]  &&  [[ ${CONTAINER_USER} -lt 1000 ]]; then
-        prt_str="# [WARNING] Selected User ID ${CONTAINER_USER} is below 1000. This ID might interfere with User-IDs inside the container and cause undefined behavior! #"
-        printf -- '#%.0s' $(seq 1 ${#prt_str})
-        echo
-        echo "${prt_str}"
-        printf -- '#%.0s' $(seq 1 ${#prt_str})
-        echo
+  prt_str="# [WARNING] Selected User ID ${CONTAINER_USER} is below 1000. This ID might interfere with User-IDs inside the container and cause undefined behavior! #"
+  printf -- '#%.0s' $(seq 1 ${#prt_str})
+  echo
+  echo "${prt_str}"
+  printf -- '#%.0s' $(seq 1 ${#prt_str})
+  echo
 fi
 
 if [[ ${CONTAINER_GROUP} -ne 0 ]]  && [[ ${CONTAINER_GROUP} -lt 1000 ]]; then
-        prt_str="# [WARNING] Selected Group ID ${CONTAINER_GROUP} is below 1000. This ID might interfere with Group-IDs inside the container and cause undefined behavior! #"
-        printf -- '#%.0s' $(seq 1 ${#prt_str})
-        echo
-        echo "${prt_str}"
-        printf -- '#%.0s' $(seq 1 ${#prt_str})
-        echo
+  prt_str="# [WARNING] Selected Group ID ${CONTAINER_GROUP} is below 1000. This ID might interfere with Group-IDs inside the container and cause undefined behavior! #"
+  printf -- '#%.0s' $(seq 1 ${#prt_str})
+  echo
+  echo "${prt_str}"
+  printf -- '#%.0s' $(seq 1 ${#prt_str})
+  echo
 fi
 
-# If the container exists but is exited, it can be restarted.
+# コンテナが存在しつつ待機状態にあれば、再始動できる。
 if [ "$(docker ps -aq -f name="${CONTAINER_NAME}")" ]; then
-	echo "[WARNING] Container ${CONTAINER_NAME} exists."
-	echo "[HINT] It can also be restarted with \"docker start ${CONTAINER_NAME}\" or removed with \"docker rm ${CONTAINER_NAME}\" if required."
-	echo	
-	echo -n "Press \"s\" to start, and \"r\" to remove: "
-	read -r -n 1 k <&1
-	echo
-	if [[ $k = s ]] ; then
+  echo "[WARNING] コンテナ ${CONTAINER_NAME} が待機状態です。"
+  echo "          再びstartするか、removeすることもできます。"
+  #echo "[HINT] It can also be restarted with \"docker start ${CONTAINER_NAME}\" or removed with \"docker rm ${CONTAINER_NAME}\" if required."
+  echo
+  echo -n "\"s\"キーでstart, または\"r\"キーでremoveします："
+  read -r -n 1 k <&1
+  echo
+  if [[ $k = s ]] ; then
 
     ## 追加処理ここから ##
     # 現在のDISPLAY変数の値を取得する
@@ -185,7 +191,7 @@ if [ "$(docker ps -aq -f name="${CONTAINER_NAME}")" ]; then
       if [ -f "$HOME/.Xauthority" ]; then
         XAUTH="$HOME/.Xauthority"
       else
-        echo "[ERROR] Xauthority could not be found. Please set it manually!"
+        echo "[ERROR] Xauthority が見つかりません！"
         exit 1
       fi
     else
@@ -200,17 +206,16 @@ if [ "$(docker ps -aq -f name="${CONTAINER_NAME}")" ]; then
     fi
     ## 追加処理ここまで ##
 
-		${ECHO_IF_DRY_RUN} docker start "${CONTAINER_NAME}"
-	elif [[ $k = r ]] ; then
-		${ECHO_IF_DRY_RUN} docker rm "${CONTAINER_NAME}"
-	fi
+    ${ECHO_IF_DRY_RUN} docker start "${CONTAINER_NAME}"
+  elif [[ $k = r ]] ; then
+    ${ECHO_IF_DRY_RUN} docker rm "${CONTAINER_NAME}"
+  fi
+
+# コンテナが存在せず、新造する
 else
-	echo "[INFO] Container does not exist, creating ${CONTAINER_NAME} ..."
-	# Finally, run the container, and set DISPLAY to the local display number
-	#${ECHO_IF_DRY_RUN} docker pull "${DOCKER_USER}/${DOCKER_IMAGE}:${DOCKER_TAG}"
-	# Disable SC2086, $PARAMS must be globbed and splitted.
-	# shellcheck disable=SC2086
-	${ECHO_IF_DRY_RUN} docker run -d --user "${CONTAINER_USER}:${CONTAINER_GROUP}" \
+  echo "[INFO] コンテナが存在しません。${CONTAINER_NAME} という名前で作成します..."
+  #${ECHO_IF_DRY_RUN} docker pull "${DOCKER_USER}/${DOCKER_IMAGE}:${DOCKER_TAG}"
+  ${ECHO_IF_DRY_RUN} docker run -d --user "${CONTAINER_USER}:${CONTAINER_GROUP}" \
     -e "DISPLAY=${DISP}" \
     -v "${DESIGNS}:/foss/designs:rw" \
     -v "/pdk:/foss/server_lib:ro" \
