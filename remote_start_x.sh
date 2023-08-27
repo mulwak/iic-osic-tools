@@ -61,7 +61,7 @@ if [ -z ${DOCKER_USER+z} ]; then
 fi
 
 if [ -z ${DOCKER_IMAGE+z} ]; then
-	DOCKER_IMAGE="iic-osic-tools"
+	DOCKER_IMAGE="islab-osic-tools"
 fi
 
 if [ -z ${DOCKER_TAG+z} ]; then
@@ -207,13 +207,13 @@ if [ "$(docker ps -aq -f name="${CONTAINER_NAME}")" ]; then
 else
 	echo "[INFO] Container does not exist, creating ${CONTAINER_NAME} ..."
 	# Finally, run the container, and set DISPLAY to the local display number
-	${ECHO_IF_DRY_RUN} docker pull "${DOCKER_USER}/${DOCKER_IMAGE}:${DOCKER_TAG}"
+	#${ECHO_IF_DRY_RUN} docker pull "${DOCKER_USER}/${DOCKER_IMAGE}:${DOCKER_TAG}"
 	# Disable SC2086, $PARAMS must be globbed and splitted.
 	# shellcheck disable=SC2086
 	${ECHO_IF_DRY_RUN} docker run -d --user "${CONTAINER_USER}:${CONTAINER_GROUP}" \
     -e "DISPLAY=${DISP}" \
     -v "${DESIGNS}:/foss/designs:rw" \
     ${PARAMS} \
-    --name "${CONTAINER_NAME}" "${DOCKER_USER}/${DOCKER_IMAGE}:${DOCKER_TAG}"
+    --name "${CONTAINER_NAME}" "${DOCKER_IMAGE}:${DOCKER_TAG}"
 fi
 
