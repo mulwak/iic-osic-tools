@@ -213,6 +213,8 @@ else
 	${ECHO_IF_DRY_RUN} docker run -d --user "${CONTAINER_USER}:${CONTAINER_GROUP}" \
     -e "DISPLAY=${DISP}" \
     -v "${DESIGNS}:/foss/designs:rw" \
+    -v "/pdk:/foss/server_lib:ro" \
+    -v "/user_share:/foss/user_share:rw" \
     ${PARAMS} \
     --name "${CONTAINER_NAME}" "${DOCKER_IMAGE}:${DOCKER_TAG}"
 fi
