@@ -35,17 +35,35 @@ fi
 if [ "$(docker ps -q -f name="${CONTAINER_NAME}")" ]; then
   echo "[WARNING] コンテナが実行中です！"
   echo "          別の端末で付けっぱなしではありませんか？"
-  echo "          強制的にstopするか、removeしてしまうこともできます。"
-  #echo "[HINT] It can also be stopped with \"docker stop ${CONTAINER_NAME}\" and removed with \"docker rm ${CONTAINER_NAME}\" if required."
+  echo "          何もせずそっとしておく(\"q\"uit)か、強制的に停止させる(\"s\"top)ことができます。"
+  echo "          コンテナを削除(\"r\"emove)することもできます。"
   echo
-  echo -n "\"s\"キーでstop, または\"r\"キーでremoveします："
+  echo -n "\"q\"キーでquit、\"s\"キーでstop、\"r\"キーでremoveします："
   read -r -n 1 k <&1
   echo
   if [[ $k = s ]] ; then
     ${ECHO_IF_DRY_RUN} docker stop "${CONTAINER_NAME}"
+    echo "[INFO] コンテナを停止しました。"
   elif [[ $k = r ]] ; then
-    ${ECHO_IF_DRY_RUN} docker stop "${CONTAINER_NAME}"
-    ${ECHO_IF_DRY_RUN} docker rm "${CONTAINER_NAME}"
+    echo "[WARNING] コンテナを削除して再作成しようとしています！"
+    echo "          大抵の場合は何の問題もなく、環境と心をリフレッシュできます。"
+    echo "          designesディレクトリや共有ディレクトリの中身には影響しません。"
+    echo "          それ以外の場所に重要な変更を加えた憶えがある場合は躊躇してください。"
+    echo
+    echo -n "\"n\"キーで終了、\"y\"キーで続行："
+    read -r -n 1 kk <&1
+    echo
+    if [[ $kk = y ]] ; then
+      ${ECHO_IF_DRY_RUN} docker stop "${CONTAINER_NAME}"
+      ${ECHO_IF_DRY_RUN} docker rm "${CONTAINER_NAME}"
+      echo "[INFO] コンテナを削除しました。"
+    else
+      echo "[INFO] スクリプトを終了します。"
+      exit 1
+    fi
+  else
+    echo "[INFO] スクリプトを終了します。"
+    exit 1
   fi
 fi
 
@@ -169,47 +187,36 @@ fi
 
 # コンテナが存在しつつ待機状態にあれば、再始動できる。
 if [ "$(docker ps -aq -f name="${CONTAINER_NAME}")" ]; then
-  echo "[WARNING] コンテナ ${CONTAINER_NAME} が待機状態です。"
-  echo "          再びstartするか、removeすることもできます。"
-  #echo "[HINT] It can also be restarted with \"docker start ${CONTAINER_NAME}\" or removed with \"docker rm ${CONTAINER_NAME}\" if required."
-  echo
-  echo -n "\"s\"キーでstart, または\"r\"キーでremoveします："
-  read -r -n 1 k <&1
-  echo
-  if [[ $k = s ]] ; then
-
-    ## 追加処理ここから ##
-    # 現在のDISPLAY変数の値を取得する
-    CURRENT_DISPLAY="$DISPLAY"
-    CURRENT_SCREEN_NUMBER=$(echo "$CURRENT_DISPLAY" | sed 's/.*:\(.*\)\..*/\1/')
-    DISP="172.17.0.1:${CURRENT_SCREEN_NUMBER}"
-    # バインド用ファイルに書き出す
-    DISPLAY_TMPFILE="/tmp/.${CONTAINER_NAME}_display"
-    echo $DISP > $DISPLAY_TMPFILE
-    # XAUTHの再設定
-    if [ -z ${XAUTHORITY+z} ]; then
-      if [ -f "$HOME/.Xauthority" ]; then
-        XAUTH="$HOME/.Xauthority"
-      else
-        echo "[ERROR] Xauthority が見つかりません！"
-        exit 1
-      fi
+  echo "[INFO] 待機状態のコンテナ ${CONTAINER_NAME} を再開します。"
+  ## 追加処理ここから ##
+  # 現在のDISPLAY変数の値を取得する
+  CURRENT_DISPLAY="$DISPLAY"
+  CURRENT_SCREEN_NUMBER=$(echo "$CURRENT_DISPLAY" | sed 's/.*:\(.*\)\..*/\1/')
+  DISP="172.17.0.1:${CURRENT_SCREEN_NUMBER}"
+  # バインド用ファイルに書き出す
+  DISPLAY_TMPFILE="/tmp/.${CONTAINER_NAME}_display"
+  echo $DISP > $DISPLAY_TMPFILE
+  # XAUTHの再設定
+  if [ -z ${XAUTHORITY+z} ]; then
+    if [ -f "$HOME/.Xauthority" ]; then
+      XAUTH="$HOME/.Xauthority"
     else
-      XAUTH=$XAUTHORITY
+      echo "[ERROR] Xauthority が見つかりません！"
+      exit 1
     fi
-    XAUTH_TMP="/tmp/.${CONTAINER_NAME}_xauthority"
-    ${ECHO_IF_DRY_RUN} echo -n > "${XAUTH_TMP}"
-    if [ -z "${ECHO_IF_DRY_RUN}" ]; then
-      xauth -f "${XAUTH}" nlist "${DISPLAY}" | sed -e 's/^..../ffff/' | xauth -f "${XAUTH_TMP}" nmerge -
-    else
-      ${ECHO_IF_DRY_RUN} "xauth -f ${XAUTH} nlist ${DISPLAY} | sed -e 's/^..../ffff/' | xauth -f ${XAUTH_TMP} nmerge -"
-    fi
-    ## 追加処理ここまで ##
-
-    ${ECHO_IF_DRY_RUN} docker start "${CONTAINER_NAME}"
-  elif [[ $k = r ]] ; then
-    ${ECHO_IF_DRY_RUN} docker rm "${CONTAINER_NAME}"
+  else
+    XAUTH=$XAUTHORITY
   fi
+  XAUTH_TMP="/tmp/.${CONTAINER_NAME}_xauthority"
+  ${ECHO_IF_DRY_RUN} echo -n > "${XAUTH_TMP}"
+  if [ -z "${ECHO_IF_DRY_RUN}" ]; then
+    xauth -f "${XAUTH}" nlist "${DISPLAY}" | sed -e 's/^..../ffff/' | xauth -f "${XAUTH_TMP}" nmerge -
+  else
+    ${ECHO_IF_DRY_RUN} "xauth -f ${XAUTH} nlist ${DISPLAY} | sed -e 's/^..../ffff/' | xauth -f ${XAUTH_TMP} nmerge -"
+  fi
+  ## 追加処理ここまで ##
+
+  ${ECHO_IF_DRY_RUN} docker start "${CONTAINER_NAME}"
 
 # コンテナが存在せず、新造する
 else
