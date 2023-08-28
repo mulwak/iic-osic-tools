@@ -1,6 +1,6 @@
 #######################################################################
 # skelの内容を反映
 #######################################################################
-FROM hpretl/iic-osic-tools:latest
+FROM hpretl/iic-osic-tools:2023.08
 COPY --chmod=755 images/iic-osic-tools/skel /
 
